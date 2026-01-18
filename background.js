@@ -99,7 +99,7 @@ async function explainWithAI(text, isNewConversation = false) {
     throw new Error('Add your Gemini API key in Options.');
   }
   
-  const model = cfg.model || 'gemini-2.0-flash';
+  const model = cfg.model || 'gemini-2.5-flash';
   const chatId = isNewConversation ? generateChatId() : null;
   const prompt = `Explain the following in simple, beginner-friendly terms. Keep it under 120 words:\n\n"${text}"`;
 
@@ -152,7 +152,7 @@ async function followUpWithAI(question, chatId, context) {
     throw new Error('Add your Gemini API key in Options.');
   }
   
-  const model = cfg.model || 'gemini-2.0-flash';
+  const model = cfg.model || 'gemini-2.5-flash';
   
   // Build conversation history for context
   let conversationText = '';
@@ -246,7 +246,7 @@ async function updateChatHistory(chatId, updatedContext) {
 function getConfig() {
   return browser.storage.sync.get({
     apiKey: '',
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     autoLookup: true,
     darkMode: true
   });
