@@ -83,24 +83,43 @@ function ensureTooltip() {
   const wrap = document.createElement('div');
   wrap.id = 'qdae-tooltip';
   wrap.style.pointerEvents = 'auto';
-  wrap.style.maxWidth = '360px';
+  wrap.style.maxWidth = '400px';
   wrap.style.background = 'rgba(17,24,39,0.98)';
   wrap.style.color = 'white';
-  wrap.style.padding = '10px 12px';
+  wrap.style.padding = '12px 16px';
   wrap.style.borderRadius = '12px';
-  wrap.style.boxShadow = '0 8px 20px rgba(0,0,0,0.35)';
+  wrap.style.boxShadow = '0 8px 24px rgba(0,0,0,0.4)';
   wrap.style.fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, Arial';
   wrap.style.fontSize = '14px';
   wrap.style.display = 'none';
+  wrap.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+  wrap.style.opacity = '0';
+  wrap.style.transform = 'translateY(-5px)';
 
   const closeBtn = document.createElement('button');
   closeBtn.textContent = '✕';
   closeBtn.style.border = '0';
-  closeBtn.style.background = 'transparent';
+  closeBtn.style.background = 'rgba(255,255,255,0.1)';
   closeBtn.style.color = 'white';
   closeBtn.style.cursor = 'pointer';
   closeBtn.style.float = 'right';
   closeBtn.style.marginLeft = '8px';
+  closeBtn.style.width = '24px';
+  closeBtn.style.height = '24px';
+  closeBtn.style.borderRadius = '4px';
+  closeBtn.style.display = 'flex';
+  closeBtn.style.alignItems = 'center';
+  closeBtn.style.justifyContent = 'center';
+  closeBtn.style.fontSize = '16px';
+  closeBtn.style.transition = 'background-color 0.2s ease';
+  
+  closeBtn.addEventListener('mouseenter', () => {
+    closeBtn.style.background = 'rgba(255,255,255,0.2)';
+  });
+  
+  closeBtn.addEventListener('mouseleave', () => {
+    closeBtn.style.background = 'rgba(255,255,255,0.1)';
+  });
 
   const title = document.createElement('div');
   title.textContent = 'Quick Definition';
@@ -138,18 +157,48 @@ explainBtn.style.color = 'black';
 
   closeBtn.addEventListener('click', (e) => { 
     e.stopPropagation();
-    wrap.style.display = 'none';
-    // Clear selection to prevent auto-show
-    window.getSelection().removeAllRanges();
+    // Animate out
+    wrap.style.opacity = '0';
+    wrap.style.transform = 'translateY(-5px)';
+    setTimeout(() => {
+      wrap.style.display = 'none';
+      // Clear selection to prevent auto-show
+      window.getSelection().removeAllRanges();
+    }, 200);
   });
   explainBtn.addEventListener('click', async () => {
     explainBtn.disabled = true;
     explainBtn.textContent = 'Explaining...';
+    
+    // Get page context if enabled
+    let pageContext = null;
+    try {
+      const config = await browser.storage.sync.get({ includePageContext: false });
+      if (config.includePageContext) {
+        // Get page content
+        const bodyClone = document.body.cloneNode(true);
+        const scripts = bodyClone.querySelectorAll('script, style, noscript, iframe, embed, object');
+        scripts.forEach(el => el.remove());
+        let pageText = bodyClone.innerText || bodyClone.textContent || '';
+        if (pageText.length > 5000) {
+          pageText = pageText.substring(0, 5000) + '...';
+        }
+        pageContext = {
+          title: document.title || '',
+          url: window.location.href || '',
+          content: pageText.trim()
+        };
+      }
+    } catch (error) {
+      console.log('Could not get page context:', error);
+    }
+    
     try {
       const res = await sendMessageWithRetry({ 
         type: 'AI_EXPLAIN', 
         payload: { 
-          text: lastSelection
+          text: lastSelection,
+          pageContext: pageContext
         } 
       });
       if (res?.ok) {
@@ -191,6 +240,11 @@ async function showTooltipAt(x, y, text) {
   tooltip.style.left = `${x + 10}px`;
   tooltip.style.top = `${y + 10}px`;
   tooltip.style.display = 'block';
+  // Animate in
+  setTimeout(() => {
+    tooltip.style.opacity = '1';
+    tooltip.style.transform = 'translateY(0)';
+  }, 10);
 }
 
 document.addEventListener('mouseup', async (e) => {
@@ -203,7 +257,12 @@ document.addEventListener('mouseup', async (e) => {
         lastSelection = sel;
         showTooltipAt(e.clientX, e.clientY, sel);
       } else if (!sel && tooltip) {
-        tooltip.style.display = 'none';
+        // Animate out
+        tooltip.style.opacity = '0';
+        tooltip.style.transform = 'translateY(-5px)';
+        setTimeout(() => {
+          tooltip.style.display = 'none';
+        }, 200);
       }
     }).catch(() => {
       // Ignore storage errors
@@ -217,7 +276,12 @@ document.addEventListener('selectionchange', () => {
     if (!data.autoLookup) return;
     const sel = window.getSelection()?.toString().trim();
     if (!sel && tooltip) {
-      tooltip.style.display = 'none';
+      // Animate out
+      tooltip.style.opacity = '0';
+      tooltip.style.transform = 'translateY(-5px)';
+      setTimeout(() => {
+        tooltip.style.display = 'none';
+      }, 200);
     }
   });
 });
@@ -236,8 +300,20 @@ browser.runtime.onMessage.addListener((msg) => {
     tooltip.style.left = '20px';
     tooltip.style.top = '20px';
     tooltip.style.display = 'block';
+    // Animate in
+    setTimeout(() => {
+      tooltip.style.opacity = '1';
+      tooltip.style.transform = 'translateY(0)';
+    }, 10);
   } else if (msg?.type === 'HIDE_TOOLTIP') {
-    if (tooltip) tooltip.style.display = 'none';
+    if (tooltip) {
+      // Animate out
+      tooltip.style.opacity = '0';
+      tooltip.style.transform = 'translateY(-5px)';
+      setTimeout(() => {
+        tooltip.style.display = 'none';
+      }, 200);
+    }
   }
 });
 
@@ -262,5 +338,38 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === 'GET_SELECTION') {
     const sel = window.getSelection()?.toString() || '';
     sendResponse({ selection: sel.trim() });
+    return true;
+  }
+  
+  // Get page content for context
+  if (msg?.type === 'GET_PAGE_CONTENT') {
+    try {
+      // Get main content from page body, excluding scripts and styles
+      const bodyClone = document.body.cloneNode(true);
+      // Remove script and style elements
+      const scripts = bodyClone.querySelectorAll('script, style, noscript, iframe, embed, object');
+      scripts.forEach(el => el.remove());
+      
+      // Get text content and clean it up
+      let pageText = bodyClone.innerText || bodyClone.textContent || '';
+      
+      // Limit to 5000 characters to avoid token limits
+      if (pageText.length > 5000) {
+        pageText = pageText.substring(0, 5000) + '...';
+      }
+      
+      // Also get page title and URL
+      const pageInfo = {
+        title: document.title || '',
+        url: window.location.href || '',
+        content: pageText.trim()
+      };
+      
+      sendResponse({ pageInfo });
+      return true;
+    } catch (error) {
+      sendResponse({ pageInfo: null, error: error.message });
+      return true;
+    }
   }
 });
